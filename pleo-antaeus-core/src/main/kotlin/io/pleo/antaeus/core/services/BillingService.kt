@@ -1,9 +1,27 @@
 package io.pleo.antaeus.core.services
 
-import io.pleo.antaeus.core.external.PaymentProvider
+import io.pleo.antaeus.core.models.PaymentResult
+import io.pleo.antaeus.models.InvoiceStatus
+import mu.KotlinLogging
+
+private val logger = KotlinLogging.logger {}
 
 class BillingService(
-    private val paymentProvider: PaymentProvider
+        private val invoiceService: InvoiceService,
+        private val paymentService: PaymentService,
+        private val summaryService: SummaryService
 ) {
-// TODO - Add code e.g. here
+
+    fun payPendingInvoices(): List<PaymentResult> {
+        val pendingInvoices = invoiceService.fetchAllWithStatus(InvoiceStatus.PENDING)
+        logger.info("Billing started for ${pendingInvoices.size} invoices.")
+
+        val paymentResults = pendingInvoices.map(paymentService::payInvoice)
+
+        summaryService.updateSummary(paymentResults)
+        logger.info("Billing finished for ${pendingInvoices.size} invoices.")
+
+        return paymentResults
+    }
+
 }

@@ -1,10 +1,12 @@
 
+import io.pleo.antaeus.core.external.AlertingService
 import io.pleo.antaeus.core.external.PaymentProvider
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.models.Currency
 import io.pleo.antaeus.models.Invoice
 import io.pleo.antaeus.models.InvoiceStatus
 import io.pleo.antaeus.models.Money
+import mu.KotlinLogging
 import java.math.BigDecimal
 import kotlin.random.Random
 
@@ -35,6 +37,22 @@ internal fun getPaymentProvider(): PaymentProvider {
     return object : PaymentProvider {
         override fun charge(invoice: Invoice): Boolean {
                 return Random.nextBoolean()
+        }
+    }
+}
+
+// This is a mock implementation of an alerting service
+internal fun getAlertingService(): AlertingService {
+    return object : AlertingService {
+
+        private val logger = KotlinLogging.logger {}
+
+        override fun alertProblem(invoice: Invoice, message: String) {
+            logger.error { "Mock alert raised! invoiceId=${invoice.id} message=${message}" }
+        }
+
+        override fun alertError(invoice: Invoice, message: String) {
+            logger.error { "Mock alert raised! invoiceId=${invoice.id} message=${message}" }
         }
     }
 }

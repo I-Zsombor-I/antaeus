@@ -5,11 +5,9 @@
 package io.pleo.antaeus.rest
 
 import io.javalin.Javalin
-import io.javalin.apibuilder.ApiBuilder.get
-import io.javalin.apibuilder.ApiBuilder.path
+import io.javalin.apibuilder.ApiBuilder.*
 import io.pleo.antaeus.core.exceptions.EntityNotFoundException
-import io.pleo.antaeus.core.services.CustomerService
-import io.pleo.antaeus.core.services.InvoiceService
+import io.pleo.antaeus.core.services.*
 import mu.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
@@ -17,7 +15,10 @@ private val thisFile: () -> Unit = {}
 
 class AntaeusRest(
     private val invoiceService: InvoiceService,
-    private val customerService: CustomerService
+    private val customerService: CustomerService,
+    private val billingService: BillingService,
+    private val schedulerService: SchedulerService,
+    private val summaryService: SummaryService
 ) : Runnable {
 
     override fun run() {
@@ -76,6 +77,32 @@ class AntaeusRest(
                         // URL: /rest/v1/customers/{:id}
                         get(":id") {
                             it.json(customerService.fetch(it.pathParam("id").toInt()))
+                        }
+                    }
+
+                    path("billing") {
+                        // URL: /rest/v1/billing
+                        post {
+                            billingService.payPendingInvoices()
+                            it.json("Billing done.")
+                        }
+                    }
+
+                    path("summary") {
+                        // URL: /rest/v1/summary
+                        get {
+                            it.json(summaryService.getSummary())
+                        }
+                    }
+
+                    path("schedule") {
+
+                        path("stop") {
+                            // URL: /rest/v1/schedule/stop
+                            post {
+                                schedulerService.removeScheduledBilling()
+                                it.json("Scheduling removed.")
+                            }
                         }
                     }
                 }

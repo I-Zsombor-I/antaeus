@@ -7,10 +7,10 @@
 
 package io.pleo.antaeus.app
 
+import getAlertingService
 import getPaymentProvider
-import io.pleo.antaeus.core.services.BillingService
-import io.pleo.antaeus.core.services.CustomerService
-import io.pleo.antaeus.core.services.InvoiceService
+import io.pleo.antaeus.core.components.PaymentProviderWrapper
+import io.pleo.antaeus.core.services.*
 import io.pleo.antaeus.data.AntaeusDal
 import io.pleo.antaeus.data.CustomerTable
 import io.pleo.antaeus.data.InvoiceTable
@@ -24,6 +24,10 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import setupInitialData
 import java.io.File
 import java.sql.Connection
+import java.time.LocalDateTime
+import java.time.LocalTime
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
 fun main() {
     // The tables to create in the database.
@@ -55,17 +59,45 @@ fun main() {
 
     // Get third parties
     val paymentProvider = getPaymentProvider()
+    val wrappedPaymentProvider = PaymentProviderWrapper(paymentProvider = paymentProvider)
+    val alertingService = getAlertingService()
 
     // Create core services
     val invoiceService = InvoiceService(dal = dal)
     val customerService = CustomerService(dal = dal)
+    val paymentService = PaymentServiceImpl(
+            wrappedPaymentProvider = wrappedPaymentProvider,
+            invoiceService = invoiceService,
+            alertingService = alertingService)
+    val summaryService = SummaryServiceImpl (
+            dateTimeProvider = { LocalDateTime.now() })
 
     // This is _your_ billing service to be included where you see fit
-    val billingService = BillingService(paymentProvider = paymentProvider)
+    val billingService = BillingService(
+            invoiceService = invoiceService,
+            paymentService = paymentService,
+            summaryService = summaryService)
+
+    val schedulerService = SchedulerServiceImpl(
+            CoroutineScope(Dispatchers.Default),
+            billingService = billingService,
+            dateTimeProvider = { LocalDateTime.now() },
+            scheduleNext = { true }
+    )
+
+    //Start scheduling the billing
+    val firstOfNextMonth = LocalDateTime.now()
+            .with(LocalTime.MIDNIGHT)
+            .withDayOfMonth(1)
+            .plusMonths(1)
+    schedulerService.scheduleMonthlyBillingFrom(firstOfNextMonth)
 
     // Create REST web service
     AntaeusRest(
         invoiceService = invoiceService,
-        customerService = customerService
+        customerService = customerService,
+        billingService = billingService,
+        schedulerService = schedulerService,
+        summaryService = summaryService
     ).run()
 }
